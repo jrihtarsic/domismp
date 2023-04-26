@@ -1067,7 +1067,7 @@ def cleanAndAddHeaderElement(filterForTestSuite,  filterForTestCases, String fie
 	def createCertificate (String savePath,
 						   keytoolPath = "keytool", keystoreFileName = 'mykeystore.jks',
 						   keypairAliasName = 'mykeystore',  keypairCommonName = "MyKeypair", keypairOrganizationUnit = "edelivery",
-						   keypairOrganization = "edelivey", keypairLocality = "Your City", keypairStateName = "Your State", def keypairCountry = "Your Country",
+						   keypairOrganization = "edelivey", keypairLocality = "Your City", keypairStateName = "Your State", keypairCountry = "Your Country",
 						         keypairKeyPassword = "test123", keypairStorePassword = "test123", keypairValidity = 730
 
 	){
