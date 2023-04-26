@@ -18,14 +18,17 @@ import javax.xml.crypto.dsig.dom.DOMValidateContext
 import javax.xml.crypto.dsig.XMLSignatureFactory
 import javax.xml.crypto.dsig.XMLSignature
 import java.util.Iterator;
-import sun.misc.IOUtils;
+// Giving error Could not find artifact xmlbeans:xbean:jar:fixed-2.4.0 in cefdigital-releases (https://ec.europa.eu/digital-building-blocks/artifact/content/repositories/eDelivery/)
+//import sun.misc.IOUtils;
+import java.util.Base64
+
 import java.text.SimpleDateFormat
 import com.eviware.soapui.support.GroovyUtils
 import com.eviware.soapui.impl.wsdl.teststeps.RestTestRequestStep
 
 
 
-class SMP
+class SMP implements  AutoCloseable
 {
     // Database parameters
     def sqlConnection;
@@ -78,9 +81,13 @@ class SMP
 	}
 	
 	// Class destructor
+	/*
     void finalize(){
         log.info "Test finished."
-    }	
+    }*/
+	void close(){
+		log.info "Test finished."
+	}
 
 //IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 	// Log information wrapper 
@@ -937,7 +944,8 @@ def cleanAndAddHeaderElement(filterForTestSuite,  filterForTestCases, String fie
 		
 		certMessage=smpSig.getTextContent();
 		def CertificateFactory cf = CertificateFactory.getInstance("X509");
-		def InputStream is = new ByteArrayInputStream(new sun.misc.BASE64Decoder().decodeBuffer(certMessage));
+		//def InputStream is = new ByteArrayInputStream(new sun.misc.BASE64Decoder().decodeBuffer(certMessage));
+		def InputStream is = Base64.decoder.decode(certMessage);
 		cert =cf.generateCertificate(is);
 		return (cert);
 	}
@@ -1044,6 +1052,61 @@ def cleanAndAddHeaderElement(filterForTestSuite,  filterForTestCases, String fie
 		log.info"======== Signature ========";
 		log.info "- Signature Value: "+signature.getSignatureValue().getValue();
 		log.info"===========================";
+	}
+
+	def executeCommand(String command) {
+		def process = command.execute()
+		process.waitFor()
+		def output = process.in.text
+		println output
+
+		LogUtils.log(output,log, DomibusConstants.LOG_LEVEL_TRACE)
+		return output
+	}
+
+	def createCertificate (String savePath,
+						   keytoolPath = "keytool", keystoreFileName = 'mykeystore.jks',
+						   keypairAliasName = 'mykeystore',  keypairCommonName = "MyKeypair", keypairOrganizationUnit = "edelivery",
+						   keypairOrganization = "edelivey", keypairLocality = "Your City", keypairStateName = "Your State", def keypairCountry = "Your Country",
+						         keypairKeyPassword = "test123", keypairStorePassword = "test123", keypairValidity = 730
+
+	){
+		//def tmpPath = getProjectCustProp("tmpPayPathBlue",log,testRunner)
+		//tmpPath = getProjectCustProp("tmpPayPathBlue",log,testRunner)
+		//def keytoolPath = 'keytool' // Update this if your keytool is not in the PATH
+		def keystoreFile = savePath + keystoreFileName
+		//def keypairAliasName = 'myalias'
+		//def keypairCommonName = "Your Name"
+		//def keypairOrganizationUnit = "Your Organization Unit"
+		//def keypairOrganization = "Your Organization"
+		//def keypairLocality = "Your City"
+		//def keypairStateName = "Your State"
+		//def keypairCountry = "Your Country"
+		//def keystoreKeyPassword = 'test123'
+		//def keypairKeyPassword = 'test123'
+		//def keystoreStorePassword = 'test123'
+		//def keypairStorePassword = 'test123'
+		//def keypairValidity = 365
+		//def dname = 'CN=Your Name, OU=Your Organization Unit, O=Your Organization, L=Your City, ST=Your State, C=Your Country'
+		def dname = "CN=$keypairCommonName, OU=$keypairOrganizationUnit, O=$keypairOrganization, L=$keypairLocality, ST=$keypairStateName, C=$keypairCountry"
+
+
+		def generateCertCommand = "$keytoolPath -genkeypair -alias $keypairAliasName -keyalg RSA -keysize 2048 -dname \"$dname\" -keystore $keystoreFile -storepass $keypairStorePassword -keypass $keypairKeyPassword -validity $keypairValidity"
+
+
+		LogUtils.log("Generating JKS certificate...",log, DomibusConstants.LOG_LEVEL_TRACE)
+		println "Generating JKS certificate..."
+		executeCommand(generateCertCommand)
+		LogUtils.log("JKS certificate created successfully.",log, DomibusConstants.LOG_LEVEL_TRACE)
+		println "JKS certificate created successfully."
+		def exportCertCommand = "$keytoolPath -exportcert -alias $keypairAliasName -keystore $keystoreFile -storepass $storePassword -rfc"
+		//full content
+		def pemCert = executeCommand(exportCertCommand)
+		// only base 64
+		def certContent = pemCert.replaceAll('(?m)^-+BEGIN CERTIFICATE-+$', "").replaceAll('(?m)^-+END CERTIFICATE-+$', "").trim()
+
+
+		return certContent
 	}
 	
 	
