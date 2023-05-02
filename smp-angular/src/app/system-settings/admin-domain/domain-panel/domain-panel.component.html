@@ -23,7 +23,7 @@
         Domain code must contain only chars and numbers and must be less than 63 chars long.
       </div>
       <div
-        *ngIf="(!editMode && domainForm.controls['domainCode'].touched || editMode) &&  domainForm.controls['domainCode'].hasError('notInList')"
+        *ngIf="(!editMode && domainForm.controls['domainCode'].touched || editMode) && domainForm.controls['domainCode'].hasError('notInList')"
         style="color:red; font-size: 70%">
         The Domain code already exists!
       </div>

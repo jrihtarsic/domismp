@@ -21,6 +21,7 @@ import {DomainResourceTypePanelComponent} from "./domain-resource-type-panel/dom
 import {DomainSmlIntegrationPanelComponent} from "./domain-sml-panel/domain-sml-integration-panel.component";
 import {MemberTypeEnum} from "../../common/enums/member-type.enum";
 import {Subscription} from "rxjs";
+import {VisibilityEnum} from "../../common/enums/visibility.enum";
 
 
 @Component({
@@ -214,6 +215,7 @@ export class AdminDomainComponent implements OnInit, OnDestroy, AfterViewInit, B
     return {
       index: null,
       domainCode: '',
+      visibility: VisibilityEnum.Public,
       smlSubdomain: '',
       smlSmpId: '',
       smlParticipantIdentifierRegExp: '',
