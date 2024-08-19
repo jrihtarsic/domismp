@@ -22,6 +22,8 @@ import java.util.Base64
 import java.text.SimpleDateFormat
 import com.eviware.soapui.support.GroovyUtils
 import com.eviware.soapui.impl.wsdl.teststeps.RestTestRequestStep
+import groovy.json.JsonSlurper
+import groovy.json.JsonOutput
 
 
 
@@ -61,6 +63,10 @@ class SMP implements  AutoCloseable
 
 	def dbUser=null
 	def dbPassword=null
+
+	static def XSFRTOKEN = null
+	static def SYSTEM_USER="system"
+	static def SYSTEM_PWD="123456"
 
 	// Constructor of the SMP Class
 	SMP(log,messageExchange,context) {
@@ -333,10 +339,461 @@ class SMP implements  AutoCloseable
 		}
 	}
 //=================================================================================
+	def static getSoapUiCustomProperty(log, context, String custPropName="", String level="testcase",canBeNull=false){	
 
+		def retPropVal=null
+		
+        switch (level.toLowerCase()) {
+            case  "testcase":
+                retPropVal=context.expand('${#TestCase#'+custPropName+'}')
+                break
+            case "testsuite":
+                retPropVal=context.expand('${#TestSuite#'+custPropName+'}')
+                break
+            case "project":
+                retPropVal=context.expand('${#Project#'+custPropName+'}')
+                break
+            default:
+				debugLog("Warning:getSoapUiCustomProperty: Unknown type of custom property level: \"$level\". Assuming test case level property", log)
+				retPropVal=context.expand('${#TestCase#'+custPropName+'}')
+        }
+		
+		if(!canBeNull){
+			assert(retPropVal!= null),"Error:getSoapUiCustomProperty: Couldn't fetch property \"$custPropName\" value at level \"$level\""
+			assert(retPropVal.trim()!= ""),"Error:getSoapUiCustomProperty: Property \"$custPropName\" at level \"$level\" returned value is empty."		
+		}
+		return retPropVal
+    }
+//=================================================================================
+	def static setSoapUiCustomProperty(log,testRunner, String custPropName="", String custPropValue="", level="testcase"){	
+        switch (level.toLowerCase()) {
+            case  "testcase":
+                testRunner.testCase.setPropertyValue(custPropName,custPropValue)
+                break
+            case "testsuite":
+                testRunner.testCase.testSuite.setPropertyValue(custPropName,custPropValue)
+                break
+            case "project":
+                testRunner.testCase.testSuite.project.setPropertyValue(custPropName,custPropValue)
+                break
+            default:
+				debugLog("Warning:setSoapUiCustomProperty: Unknown type of custom property level: \"$level\". Assuming test case level property", log)
+				testRunner.testCase.setPropertyValue(custPropName,custPropValue)
+        }	
+		debugLog("  ====  \"setSoapUiCustomProperty\" DONE.", log)
+    }
+//=================================================================================
+	def static fetchExpectedValues(context, log, String testType){
+	
+		def expectedParameters=[:]
+		
+		switch(testType.toLowerCase()){
+			case "sgextension":
+				expectedParameters["extension"]=getExtensionFromString(context, log,getSoapUiCustomProperty(log, context, "PutResourceRequestExtTemplate", "testsuite",false))
+			case "servicegroup":
+			case "resource":
+				expectedParameters["partId"]=getSoapUiCustomProperty(log, context, "ResourceIdentifierValue", "testcase",false)
+				expectedParameters["partScheme"]=getSoapUiCustomProperty(log, context, "ResourceIdentifierScheme", "testcase",true)
+				expectedParameters["version"]=getSoapUiCustomProperty(log, context, "version", "testsuite",false)
+				break;
+			case "subresourcemulti":
+			case "servicemetadatamulti":
+				expectedParameters["metadata"]=getMetadataFromString(context, log, getSoapUiCustomProperty(log, context, "PutSubresourceRequestTemplateMulti", "testsuite",false))
+			case "servicemetadata":
+			case "subresource":
+				expectedParameters["partId"]=getSoapUiCustomProperty(log, context, "ResourceIdentifierValue", "testcase",false)
+				expectedParameters["partScheme"]=getSoapUiCustomProperty(log, context, "ResourceIdentifierScheme", "testcase",true)
+				expectedParameters["version"]=getSoapUiCustomProperty(log, context, "version", "testsuite",false)
+				expectedParameters["serviceId"]=getSoapUiCustomProperty(log, context, "SubresourceIdentifierValue", "testcase",false)
+				expectedParameters["serviceScheme"]=getSoapUiCustomProperty(log, context, "SubresourceIdentifierScheme", "testcase",false)
+				if(expectedParameters["metadata"]==null){
+					expectedParameters["metadata"]=getMetadataFromString(context, log, getSoapUiCustomProperty(log, context, "PutSubresourceRequestTemplate", "testsuite",false))
+				}
+				break;
+			case "redirection":
+				expectedParameters["partId"]=getSoapUiCustomProperty(log, context, "ResourceIdentifierValue", "testcase",false)
+				expectedParameters["partScheme"]=getSoapUiCustomProperty(log, context, "ResourceIdentifierScheme", "testcase",true)
+				expectedParameters["version"]=getSoapUiCustomProperty(log, context, "version", "testsuite",false)
+				expectedParameters["serviceId"]=getSoapUiCustomProperty(log, context, "SubresourceIdentifierValue", "testcase",false)
+				expectedParameters["serviceScheme"]=getSoapUiCustomProperty(log, context, "SubresourceIdentifierScheme", "testcase",false)
+				expectedParameters["redirectUrl"]=getSoapUiCustomProperty(log, context, "redirectUrl", "testcase",false)
+				break;	
+			case "contenttype":
+				expectedParameters["contenttype"]=getSoapUiCustomProperty(log, context, "contenttype", "testcase",false)
+				expectedParameters["charset"]=getSoapUiCustomProperty(log, context, "charset", "testcase",false)
+				break;	
+			case "signature":
+				expectedParameters["smpsignaturemethod"]=getSoapUiCustomProperty(log, context, "smpsignaturemethod", "testsuite",false)
+				expectedParameters["smpsignaturesubj"]=getSoapUiCustomProperty(log, context, "smpsignaturesubj", "testsuite",true)
+				break;				
+			default:
+				assert(0), "Error: -fetchExpectedValues-Unknown operation: "+testType+"."+" Possible operations: resource, servicegroup, subresource, servicemetadata, Redirection, Signature, contentType.";
+				break;
+		}
+		return expectedParameters
+	}
+//=================================================================================
+//========================== verify test results ==========================
+//=================================================================================
+	def static verifyTestResults(context, log, messageExchange, String testType){
+		debugLog("Verifying test results ...", log)
+		def responseParameters=[:]
+		def expectedParameters=[:]
+		responseParameters=retrieveResponseParameters(context, log, messageExchange, testType)		
+		expectedParameters=fetchExpectedValues(context, log, testType)
+		debugLog("responseParameters="+responseParameters, log)
+		debugLog("expectedParameters="+expectedParameters, log)
+		switch(testType.toLowerCase()){
+			case "sgextension":
+				assert(compare2XMLs(log,expectedParameters["extension"], responseParameters["extension"])), " Error: extension in the response does not match the expected value "
+			case "servicegroup":
+			case "resource":
+				assert(expectedParameters["partId"].toLowerCase().equals(responseParameters["partId"].toLowerCase())),"Error: ParticipantID response value: "+responseParameters["partId"]+" does not match expected value: "+expectedParameters["partId"] 
+				assert(expectedParameters["partScheme"].toLowerCase().equals(responseParameters["partScheme"].toLowerCase())),"Error: ParticipantScheme response value: "+responseParameters["partScheme"]+" does not match expected value: "+expectedParameters["partScheme"]
+				assert(expectedParameters["version"].toLowerCase().equals(responseParameters["version"].toLowerCase())),"Error: version response value: "+responseParameters["version"]+" does not match expected value: "+expectedParameters["version"]
+				break;
+			case "subresourcemulti":
+			case "servicemetadatamulti":
+			case "servicemetadata":
+			case "subresource":
+				assert(expectedParameters["partId"].toLowerCase().equals(responseParameters["partId"].toLowerCase())),"Error: ParticipantID response value: "+responseParameters["partId"]+" does not match expected value: "+expectedParameters["partId"] 
+				assert(expectedParameters["partScheme"].toLowerCase().equals(responseParameters["partScheme"].toLowerCase())),"Error: ParticipantScheme response value: "+responseParameters["partScheme"]+" does not match expected value: "+expectedParameters["partScheme"]
+				assert(expectedParameters["version"].toLowerCase().equals(responseParameters["version"].toLowerCase())),"Error: version response value: "+responseParameters["version"]+" does not match expected value: "+expectedParameters["version"]
+				assert(expectedParameters["serviceId"].toLowerCase().equals(responseParameters["serviceId"].toLowerCase())),"Error: serviceId response value: "+responseParameters["serviceId"]+" does not match expected value: "+expectedParameters["serviceId"] 
+				assert(expectedParameters["serviceScheme"].toLowerCase().equals(responseParameters["serviceScheme"].toLowerCase())),"Error: serviceScheme response value: "+responseParameters["serviceScheme"]+" does not match expected value: "+expectedParameters["serviceScheme"]
+				assert(compare2XMLs(log,expectedParameters["metadata"], responseParameters["metadata"])), " Error: metadata in the response does not match the expected value "
+				break;
+			case "redirection":
+				assert(expectedParameters["partId"].toLowerCase().equals(responseParameters["partId"].toLowerCase())),"Error: ParticipantID response value: "+responseParameters["partId"]+" does not match expected value: "+expectedParameters["partId"] 
+				assert(expectedParameters["partScheme"].toLowerCase().equals(responseParameters["partScheme"].toLowerCase())),"Error: ParticipantScheme response value: "+responseParameters["partScheme"]+" does not match expected value: "+expectedParameters["partScheme"]
+				assert(expectedParameters["version"].toLowerCase().equals(responseParameters["version"].toLowerCase())),"Error: version response value: "+responseParameters["version"]+" does not match expected value: "+expectedParameters["version"]
+				assert(expectedParameters["serviceId"].toLowerCase().equals(responseParameters["serviceId"].toLowerCase())),"Error: serviceId response value: "+responseParameters["serviceId"]+" does not match expected value: "+expectedParameters["serviceId"] 
+				assert(expectedParameters["serviceScheme"].toLowerCase().equals(responseParameters["serviceScheme"].toLowerCase())),"Error: serviceScheme response value: "+responseParameters["serviceScheme"]+" does not match expected value: "+expectedParameters["serviceScheme"]
+				assert(expectedParameters["redirectUrl"].toLowerCase().equals(responseParameters["redirectUrl"].toLowerCase())),"Error: redirectUrl response value: "+responseParameters["redirectUrl"]+" does not match expected value: "+expectedParameters["redirectUrl"]
+				break;
+			case  "contenttype":
+				assert(expectedParameters["contenttype"].toLowerCase().equals(responseParameters["contenttype"].toLowerCase())),"Error: Content-Type response value: "+responseParameters["contenttype"]+" does not match expected value: "+expectedParameters["contenttype"] 
+				assert(expectedParameters["charset"].toLowerCase().equals(responseParameters["charset"].toLowerCase())),"Error: Charset response value: "+responseParameters["charset"]+" does not match expected value: "+expectedParameters["charset"] 
+				break;
+			case  "signature":
+				assert(expectedParameters["smpsignaturemethod"].toLowerCase().equals(responseParameters["smpsignaturemethod"].toLowerCase())),"Error: SMP signature method response value: "+responseParameters["smpsignaturemethod"]+" does not match expected value: "+expectedParameters["smpsignaturemethod"] 
+				assert(expectedParameters["smpsignaturesubj"].toLowerCase().equals(responseParameters["smpsignaturesubj"].toLowerCase())),"Error: SMP signature subject response value: "+responseParameters["smpsignaturesubj"]+" does not match expected value: "+expectedParameters["smpsignaturesubj"] 
+				break;
+			default:
+				assert(0), "Error: -verifyTestResults-Unknown operation: "+testType+"."+" Possible operations: resource, servicegroup, subresource, servicemetadata, Redirection, Signature, contentType.";
+				break;
+		}
+		debugLog("Test results verified successfully", log)
+				
+	}
+	
+	def static String getMetadataFromString(context, log, String input){
+		def certValue="";
+		def newCertValue=""
+		def certId="contentbinaryobject";
+		def stringMeta=extractFromXML(removeNamespaces(input),"ProcessMetadata")	
+		def details=null
+		def allNodes=null
 
+		if(stringMeta.length()==0){
+			stringMeta=extractFromXML(removeNamespaces(input),"ProcessList")
+			certId="certificate";
+		}		
+		details = new XmlSlurper().parseText(input);
+		allNodes = details.depthFirst().each{
+					if(it.name().toLowerCase().equals(certId)){
+						certValue=it.text();
+					}
+		}
+		newCertValue=certValue.replaceAll("\\s","")
+		return stringMeta.replace(certValue,newCertValue)
+	}
 
+	def static String getExtensionFromString(context, log, String input){
+		def stringMeta=extractFromXML(removeNamespaces(input),"SMPExtensions")	
 
+		if(stringMeta.length()==0){
+			stringMeta=extractFromXML(removeNamespaces(input),"Extension")
+		}		
+
+		return stringMeta
+	}
+//=================================================================================
+//========================== Extract and return response parameters ==========================
+//=================================================================================
+	def static retrieveResponseParameters(context, log, messageExchange, String testType){
+		def parametersMap=[:];
+		def ctMap=[];
+		def headers=null;
+		def allNodes=null;
+		// Load the response xml file
+		def responseContent = messageExchange.getResponseContentAsXml();
+		// Extract the Participant Identifier, the references to the signed metadata and the extensions from the Response
+		def ServiceDetails = new XmlSlurper().parseText(responseContent);
+		parametersMap["version"]="1.0"
+		switch(testType.toLowerCase()){
+			case "sgextension":
+				parametersMap["extension"]=getExtensionFromString(context, log, responseContent)							
+			case "servicegroup":
+			case "resource":
+				allNodes = ServiceDetails.depthFirst().each{
+					if(it.name().toLowerCase().equals("participantid")){
+						parametersMap["partId"]=it.text();
+						parametersMap["partScheme"]=it.@schemeID.text();
+					}
+					if(it.name().toLowerCase().equals("participantidentifier")){
+						parametersMap["partId"]=it.text();
+						parametersMap["partScheme"]=it.@scheme.text();
+					}
+					if(it.name().toLowerCase().equals("smpversionid")){
+						parametersMap["version"]=it.text();
+					}
+				}
+				break;
+
+			case "subresourcemulti":
+			case "servicemetadatamulti":
+			case "servicemetadata":
+			case "subresource":
+				allNodes = ServiceDetails.depthFirst().each{
+					if(it.name().toLowerCase().equals("participantid")){
+						parametersMap["partId"]=it.text();
+						parametersMap["partScheme"]=it.@schemeID.text();
+					}
+					if(it.name().toLowerCase().equals("participantidentifier")){
+						parametersMap["partId"]=it.text();
+						parametersMap["partScheme"]=it.@scheme.text();
+					}
+					if(it.name().toLowerCase().equals("smpversionid")){
+						parametersMap["version"]=it.text();
+					}
+					if(it.name().toLowerCase().equals("serviceid")){
+						parametersMap["serviceId"]=it.text();
+						parametersMap["serviceScheme"]=it.@schemeID.text();
+					}
+					if(it.name().toLowerCase().equals("documentidentifier")){
+						parametersMap["serviceId"]=it.text();
+						parametersMap["serviceScheme"]=it.@scheme.text();
+					}
+					parametersMap["metadata"]=getMetadataFromString(context, log, responseContent)
+				
+				}
+				
+				break;
+			case "redirection":
+				allNodes = ServiceDetails.depthFirst().each{
+					if(it.name().toLowerCase().equals("participantid")){
+						parametersMap["partId"]=it.text();
+						parametersMap["partScheme"]=it.@schemeID.text();
+					}
+					if(it.name().toLowerCase().equals("participantidentifier")){
+						parametersMap["partId"]=it.text();
+						parametersMap["partScheme"]=it.@scheme.text();
+					}
+					if(it.name().toLowerCase().equals("smpversionid")){
+						parametersMap["version"]=it.text();
+					}
+					if(it.name().toLowerCase().equals("serviceid")){
+						parametersMap["serviceId"]=it.text();
+						parametersMap["serviceScheme"]=it.@schemeID.text();
+					}
+					if(it.name().toLowerCase().equals("documentidentifier")){
+						parametersMap["serviceId"]=it.text();
+						parametersMap["serviceScheme"]=it.@scheme.text();
+					}
+					if((it.name().toLowerCase().equals("publisheruri")) && (it.parent().name().toLowerCase().equals("redirect"))){
+						parametersMap["redirectUrl"]=it.text();
+					}
+					if(it.name().toLowerCase().equals("redirect")){
+						parametersMap["redirectUrl"]=it.@href.text();
+					}
+				}
+				break;
+			case "contenttype":
+				headers=messageExchange.getResponseHeaders()
+				headers.each{ header ->
+					if(header.getKey().equals("Content-Type")){
+						ctMap=header.getValue()[0].split(";")
+						parametersMap["contenttype"]=ctMap[0]
+						parametersMap["charset"]=ctMap[1].split("=")[1]
+					}
+				}
+				break;				
+			case "signature":
+				allNodes = ServiceDetails.depthFirst().each{
+					if(it.name().toLowerCase().equals("signaturemethod")){
+						parametersMap["smpsignaturemethod"]=it.@Algorithm.text();
+					}
+					if(it.name().toLowerCase().equals("x509subjectname")){
+						parametersMap["smpsignaturesubj"]=it.text();
+					}
+				}				
+				break;
+			default:
+				assert(0), "Error: -retrieveResponseParameters-Unknown operation: "+testType+"."+" Possible operations: resource, servicegroup, subresource, servicemetadata, Redirection, Signature, contentType.";
+				break;
+		}
+		return parametersMap
+	}
+//=================================================================================
+//========================== Retrieve SMP Property metadata ================================
+//=================================================================================
+	def static getSmpConfigPropertyMeta(log, context, propName, authenticationUser=SYSTEM_USER, authenticationPwd=SYSTEM_PWD){
+		debugLog("Calling \"getSmpConfigPropertyMeta\".", log)
+		debugLog("  getSmpConfigPropertyMeta  [][]  Property to get: \"$propName\".", log)
+		def jsonSlurper = new JsonSlurper()
+		def commandString=null
+		def commandResult=null 
+		def propMap=null 
+		def propMetadata=null
+		def propMeta=null
+		def urlToSMP=getSoapUiCustomProperty(log, context, "url", "project",false)
+		def urlExt="/ui/internal/rest/property?"
+
+		try{
+			commandString=["curl", urlToSMP + urlExt + "page=0&pageSize=50&property=$propName",
+                                 "--cookie", context.expand('${projectDir}') + File.separator + "cookie.txt",
+                                 "-H",  "Content-Type: text/xml",
+                                 "-H","X-XSRF-TOKEN: " + returnXsfrToken(log, context, authenticationUser, authenticationPwd),
+                                 "-v"]
+			commandResult=runCommandInShell(log, commandString)
+			assert(commandResult[1]==~ /(?s).*HTTP\/\d.\d\s*200.*/),"Error:getSmpConfigPropertyMeta: Error while fetching value of property \"$propName\"."
+            propMetadata=commandResult[0]
+			debugLog("  getSmpConfigPropertyMeta  [][]  Property get result: $propMetadata", log)
+            propMap=jsonSlurper.parseText(propMetadata)
+            assert(propMap != null),"Error:getSmpConfigPropertyMeta: Error while parsing the returned property value: null result found."
+			propMap.serviceEntities.each{ prop ->
+				if(prop.property.toLowerCase().equals(propName.toLowerCase())){
+					propMeta=prop
+				}
+			}
+			debugLog("  getSmpConfigPropertyMeta  [][]  Property \"$propName\" metadata = \"$propMeta\".", log)
+        }finally{
+            XSFRTOKEN=null
+        }
+		return propMeta
+	}
+//=================================================================================
+//========================== Retrieve SMP Property value ================================
+//=================================================================================
+	def static getSmpConfigPropertyValue(log, context, propName, authenticationUser=SYSTEM_USER, authenticationPwd=SYSTEM_PWD){
+		debugLog("Calling \"getSmpConfigPropertyValue\".", log)
+		debugLog("  getSmpConfigPropertyValue  [][]  Property to get: \"$propName\".", log)
+		
+		return getSmpConfigPropertyMeta(log, context, propName, authenticationUser, authenticationPwd).value
+	}
+//=================================================================================
+//========================== Set SMP Property ================================
+//=================================================================================
+	def static setSmpConfigProperty(log, context, propName, newValue, authenticationUser=SYSTEM_USER, authenticationPwd=SYSTEM_PWD){
+		debugLog("Calling \"setSmpConfigProperty\".", log)
+		debugLog("  setSmpConfigProperty  [][]  Setting property \"$propName\" to \"$newValue\".", log)
+		def updatedProp=[:]
+		def updatedPropJson=null
+		def updatedPropJsonList=[]
+		def commandString=null
+		def commandResult=null 
+		def urlToSMP=getSoapUiCustomProperty(log, context, "url", "project",false)
+		def urlExt="/ui/internal/rest/property"
+		
+		// Get the propety Metadata
+		def propMetadata=getSmpConfigPropertyMeta(log, context, propName, authenticationUser, authenticationPwd)
+		
+		propMetadata.each{index, val ->
+			updatedProp[index]=val
+		}
+		updatedProp["status"]=1
+		updatedProp["deleted"]=false
+		updatedProp["value"]=newValue
+		
+		updatedPropJsonList<<updatedProp
+		updatedPropJson=JsonOutput.toJson(updatedPropJsonList).toString()
+		
+		log.info "=========="
+		log.info "updatedPropJson=JsonOutput.toJson(updatedPropJsonList)="+JsonOutput.toJson(updatedPropJsonList)
+		log.info "updatedPropJson="+updatedPropJson
+		log.info "formatJsonForCurl(log,updatedPropJson)="+formatJsonForCurl(log,updatedPropJson)
+		log.info "=========="
+		
+        commandString=["curl", urlToSMP+urlExt,
+                                         "--cookie", context.expand('${projectDir}') + File.separator + "cookie.txt",
+                                         "-H", "Content-Type: application/json",
+                                         "-H","X-XSRF-TOKEN: " + returnXsfrToken(log, context, authenticationUser, authenticationPwd),
+                                         "-X", "PUT",
+                                         "--data", formatJsonForCurl(log,updatedPropJson),
+                                         "-v"]	
+										 
+        commandResult=runCommandInShell(log, commandString)
+        assert((commandResult[1]==~ /(?s).*HTTP\/\d.\d\s*200.*/) || commandResult[1].contains("successfully")),"Error:setSmpConfigProperty: Error while trying to connect to the SMP. CommandResult[0]:" +commandResult[0] + "| commandResult[1]:" + commandResult[1]
+		debugLog("  setSmpConfigProperty  [][]  Property \"$propName\" update done successfully.", log)		
+	}
+//============================================================================
+//========================== Run curl command ================================
+//============================================================================
+    static def runCommandInShell(log, inputCommand) {
+        debugLog("Calling \"runCommandInShell\".", log)
+        def outputCatcher = new StringBuffer()
+        def errorCatcher = new StringBuffer()
+		debugLog("  runCommandInShell  [][]  Run curl command: " + inputCommand, log)
+        if (inputCommand) {
+            def proc = inputCommand.execute()
+            if (proc != null) {
+                proc.waitForProcessOutput(outputCatcher, errorCatcher)
+            }
+        }
+		debugLog("  runCommandInShell  [][]  outputCatcher: " + outputCatcher.toString(), log)
+		debugLog("  runCommandInShell  [][]  errorCatcher: " + errorCatcher.toString(), log)
+        return ([outputCatcher.toString(), errorCatcher.toString()])
+    }
+	
+//=================================================================================
+//========================== Get returnXsfr Token =================================
+//=================================================================================	
+	static String returnXsfrToken(log, context, String userLogin=SYSTEM_USER, passwordLogin=SYSTEM_PWD) {
+		def String output=""
+		if (XSFRTOKEN == null) {
+			output=fetchCookieHeader(log, context, userLogin, passwordLogin)
+			XSFRTOKEN = output.find("XSRF-TOKEN.*;").replace("XSRF-TOKEN=", "").replace(";", "")
+		}
+		return XSFRTOKEN
+	}
+//=================================================================================
+//=========================== Get Cookie Header ===================================
+//=================================================================================	
+	static String fetchCookieHeader(log, context, String userLogin = SYSTEM_USER, passwordLogin = SYSTEM_PWD) {
+		def json=null
+		json = ifWindowsEscapeJsonString('{\"username\":\"' + "${userLogin}" + '\",\"password\":\"' + "${passwordLogin}" + '\"}')
+		def urlToSMP=getSoapUiCustomProperty(log, context, "url", "project",false)
+		def urlExt="/ui/public/rest/security/authentication"
+        def commandString = ["curl", urlToSMP+urlExt,
+                             "-i",
+                             "-H",  "Content-Type: application/json",
+                             "--data-binary", json, "-c", context.expand('${projectDir}') + File.separator + "cookie.txt",
+                             "--trace-ascii", "-"]		
+        def commandResult = runCommandInShell(log, commandString)
+        assert(commandResult[0].contains("XSRF-TOKEN")),"Error:Authenticating user: Error while trying to connect to the DomiSMP."
+        return commandResult[0]    
+	}
+//=================================================================================
+//===================== Format json input for windows =============================
+//=================================================================================		
+    static def ifWindowsEscapeJsonString(json) {
+        if (System.properties['os.name'].toLowerCase().contains('windows'))
+            json = json.replace("\"", "\\\"")
+        return json
+    }
+//=================================================================================
+//====================== Format json input for curl ===============================
+//=================================================================================		
+    static def formatJsonForCurl(log, input) {
+        if (System.properties['os.name'].toLowerCase().contains('windows')) {
+            assert(input != null),"Error:formatJsonForCurl: input string is null."
+            assert(input.contains("[") && input.contains("]")),"Error:formatJsonForCurl: input string is corrupted."
+            def intermediate = input.substring(input.indexOf("[") + 1, input.lastIndexOf("]")).replace("\"", "\"\"\"")
+            return "[" + intermediate + "]"
+        }
+        return input
+    }
 //=================================================================================
 //========================== Extract response parameters ==========================
 //=================================================================================
@@ -598,7 +1055,24 @@ class SMP implements  AutoCloseable
 		}
 		return true;
 	}
+	
+	// Difference between XMLs
+	def static Boolean compare2XMLs(log,String request, String response){
+		XMLUnit.setIgnoreWhitespace(true);
+		def DetailedDiff myDiff = new DetailedDiff(new Diff(request, response));
+		def List allDifferences = myDiff.getAllDifferences();
 
+		if(!myDiff.similar()){
+			// Enable for more logs
+			for (Object object : allDifferences){
+				Difference difference = (Difference)object;
+				log.error(difference);
+				log.error("============================");
+			}
+			return false;
+		}
+		return true;
+	}
 //=================================================================================
 
 
@@ -606,7 +1080,7 @@ class SMP implements  AutoCloseable
 //=================================================================================
 //=========================== Remove namespaces in XML ============================
 //=================================================================================
-	def String removeNamespaces(String input){
+	def static String removeNamespaces(String input){
 		def String result = null;
 		result = input.replaceAll(/<\/.{0,4}:/,"</");
 		result = result.replaceAll(/<.{0,4}:/,"<");
@@ -614,6 +1088,7 @@ class SMP implements  AutoCloseable
 		result = result.replace("%3A",":");
 		return result;
 	}
+
 //=================================================================================
 
 
@@ -640,6 +1115,18 @@ class SMP implements  AutoCloseable
 			endTag = "</ServiceInformation>";
 		}
 		result = input.substring(input.indexOf(startTag), input.indexOf(endTag));
+		return result;
+	}
+	def static String extractFromXML(String input, String target){
+		def String startTag = "<"+target+">";
+		def String endTag = "</"+target+">";
+		def targetSize=endTag.length()
+		def String result = null;
+
+		if(input.indexOf(startTag)<0){
+			return ""
+		}
+		result = input.substring(input.indexOf(startTag), input.lastIndexOf(endTag)+targetSize);
 		return result;
 	}
 //=================================================================================
