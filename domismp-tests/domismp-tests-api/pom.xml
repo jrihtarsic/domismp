@@ -11,8 +11,6 @@
         <!-- Only selected modules are deployed -->
         <maven.deploy.skip>true</maven.deploy.skip>
         <url>http://localhost:8080/smp</url>
-        <SMPAdminUser/>
-        <SMPAdminPassword/>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <!-- the soap ui specific dependencies -->
@@ -148,8 +146,6 @@
                             <!-- testCase>SMP022-Create ServiceMetadata-Basic Flow</testCase -->
                             <projectProperties>
                                 <value>url=${url}</value>
-                                <value>SMPAdminUser=${SMPAdminUser}</value>
-                                <value>SMPAdminPassword=${SMPAdminPassword}</value>
                             </projectProperties>
                         </configuration>
                         <dependencies>
