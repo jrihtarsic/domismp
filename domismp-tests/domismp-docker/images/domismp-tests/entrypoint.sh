@@ -13,7 +13,7 @@ executeUITests(){
 
 
 setConfigPropertiesAPITests() {
-  echo "[INFO] Update soapUI project and testsuite filenames ..."
+  echo "[INFO] Update soapUI project file and testsuite names ..."
      if [ -n "${TEST_FILE_NAME}" ]; then
         sed -i "s#<projectFile>\${basedir}/soapui/.*</projectFile>#<projectFile>\${basedir}/soapui/${TEST_FILE_NAME}</projectFile>#g" "${TEST_API}"/pom.xml
      fi
