@@ -20,7 +20,6 @@ setConfigPropertiesAPITests() {
      if [ -n "${TEST_SUITE}" ]; then
         sed -i "s#<testSuite>.*</testSuite>#<testSuite>${TEST_SUITE}</testSuite>#g" "${TEST_API}"/pom.xml
      fi
-     exit ${EXIT_CODE}
 }
 
 executeAPITests() {
