@@ -14,13 +14,13 @@ executeUITests(){
 
 setConfigPropertiesAPITests() {
   echo "[INFO] Update soapUI project file and testsuite names ..."
-     if [ -n "${TEST_FILE_NAME}" ]; then
-        sed -i "s#<projectFile>\${basedir}/soapui/.*</projectFile>#<projectFile>\${basedir}/soapui/${TEST_FILE_NAME}</projectFile>#g" "${TEST_API}"/pom.xml
-     fi
      if [ -n "${TEST_SUITE}" ]; then
         sed -i "s#<testSuite>.*</testSuite>#<testSuite>${TEST_SUITE}</testSuite>#g" "${TEST_API}"/pom.xml
      fi
-	 cat "${TEST_API}"/pom.xml
+	 # TODO Add the legacy test suite to the new project file then remove the following configuration 
+	 if [ -n "${TEST_FILE_NAME}" ]; then
+        sed -i "s#<projectFile>\${basedir}/soapui/.*</projectFile>#<projectFile>\${basedir}/soapui/${TEST_FILE_NAME}</projectFile>#g" "${TEST_API}"/pom.xml
+     fi
 }
 
 executeAPITests() {
