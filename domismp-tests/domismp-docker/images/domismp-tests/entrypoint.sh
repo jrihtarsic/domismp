@@ -21,9 +21,6 @@ setConfigPropertiesAPITests() {
 	 if [ -n "${TEST_FILE_NAME}" ]; then
         sed -i "s#<projectFile>\${basedir}/soapui/.*</projectFile>#<projectFile>\${basedir}/soapui/${TEST_FILE_NAME}</projectFile>#g" "${TEST_API}"/pom.xml
      fi
-	 echo "TEST_SUITE=${TEST_SUITE}"
-	 echo "TEST_FILE_NAME=${TEST_FILE_NAME}"
-	 cat "${TEST_API}"/pom.xml
 }
 
 executeAPITests() {

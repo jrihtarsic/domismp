@@ -6,11 +6,10 @@ source "${WORKDIR}/../../functions/run-test.functions"
 initializeVariables
 
 RESULT_FOLDER="${WORKDIR}/results"
+
 SMP_VERSION_SUFFIX=$1
-echo "SMP_VERSION_SUFFIX=${SMP_VERSION_SUFFIX}"
 if [ -n "${SMP_VERSION_SUFFIX}" ]; then
     SMP_VERSION_SUFFIX="-${SMP_VERSION_SUFFIX}"
-	echo "inside if SMP_VERSION_SUFFIX=${SMP_VERSION_SUFFIX}"
 fi
 # clear old results
 rm -rf "${RESULT_FOLDER}"
