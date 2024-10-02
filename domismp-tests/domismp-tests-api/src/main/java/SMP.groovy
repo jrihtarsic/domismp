@@ -1000,7 +1000,7 @@ class SMP implements  AutoCloseable
         }
 		assert((commandResult[1]==~ /(?s).*HTTP\/\d.\d\s*200.*/) || commandResult[1].contains("successfully")),"Error:setSmpConfigProperty: Error while trying to connect to the SMP. CommandResult[0]:" +commandResult[0] + "| commandResult[1]:" + commandResult[1]
 		if(waitForApp){
-			waitFor(log,"1", "min")
+			waitFor(log,"5", "min")
 		}
 		debugLog("  setSmpConfigProperty  [][]  Property \"$propName\" update done successfully.", log)		
 	}
