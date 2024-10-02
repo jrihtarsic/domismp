@@ -207,7 +207,7 @@ def domMap=[]
 def grpMap=[]
 log.info "Domains list="
 domMap=SMP.getDomainCodesList(log, context)
-domMap.each{dom
+domMap.each{dom ->
 	grpMap=SMP.getGroupNamesList(log, context, dom)
 	log.info "Domain=$dom, group list="+grpMap	
 }
