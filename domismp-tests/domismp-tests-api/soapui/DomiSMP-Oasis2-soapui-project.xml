@@ -201,7 +201,19 @@ testRunner.testCase.testSuite.getTestCaseList().each { testCase ->
 		} 
 	}
 }
-log.info "done"</script></con:config></con:testStep><con:properties/></con:testCase><con:testCase id="ab230f75-082e-4160-88d0-b278d191c56e" failOnError="true" failTestCaseOnErrors="true" keepSession="false" maxResults="0" name="SMP_001-CreateResource-BasicFlow" searchProperties="true"><con:description>Create  ServiceGroup-Basic Flow-Admin Service Group specified.
+log.info "done"</script></con:config></con:testStep><con:properties/></con:testCase><con:testCase id="300d705d-3f9b-4381-b033-5a94e428ba02" failOnError="true" failTestCaseOnErrors="true" keepSession="false" maxResults="0" name="Display domains and groups" searchProperties="true"><con:settings/><con:testStep type="groovy" name="Display domains and groups info" id="f582ac38-dbfe-41bb-aed8-7b191870df39"><con:settings/><con:config><script>log.info "=============================================="
+log.info "=============================================="
+def domMap=[]
+def grpMap=[]
+log.info "Domains list="
+domMap=SMP.getDomainCodesList(log, context)
+domMap.each{dom
+	grpMap=SMP.getGroupNamesList(log, context, dom)
+	log.info "Domain=$dom, group list="+grpMap	
+}
+log.info "=============================================="
+log.info "=============================================="
+</script></con:config></con:testStep><con:properties/></con:testCase><con:testCase id="ab230f75-082e-4160-88d0-b278d191c56e" failOnError="true" failTestCaseOnErrors="true" keepSession="false" maxResults="0" name="SMP_001-CreateResource-BasicFlow" searchProperties="true"><con:description>Create  ServiceGroup-Basic Flow-Admin Service Group specified.
 
 - Send PutServiceGroup request for a new receiver participant: duplet participantIdentifier  + participantIndentifierScheme. Request is sent within the same network as the SMP.
 - The URI and attached XML are correctly formed. Certificate of AdminServiceGroup is specified in the HTTP header.
@@ -214,8 +226,7 @@ log.info "done"</script></con:config></con:testStep><con:properties/></con:testC
 ->  HTTP Response code 200 is returned. </con:description><con:settings/><con:testStep type="restrequest" name="Put Resource" id="51e701e3-3935-4061-a62a-fc9115548c97"><con:settings/><con:config service="SMP" resourcePath="/{ResourceIdentifierScheme}::{ResourceIdentifierValue}" methodName="PUT Resource" xsi:type="con:RestRequestStep" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><con:restRequest name="Put Resource" mediaType="text/xml" postQueryString="false" id="e50d78e0-763f-4bfd-aa1c-f4dcc7595a2a"><con:settings><con:setting id="com.eviware.soapui.impl.wsdl.WsdlRequest@request-headers">&lt;xml-fragment xmlns:con="http://eviware.com/soapui/config">
   &lt;con:entry key="Resource-Group" value="${#TestSuite#groupDef}"/>
   &lt;con:entry key="domain" value="${#TestSuite#domainDef}"/>
-&lt;/xml-fragment></con:setting><con:setting id="RecordRequestRepresentations">true</con:setting></con:settings><con:endpoint>${#TestSuite#requestBaseUrl}</con:endpoint><con:request>${#TestSuite#PutResourceRequestTemplate}</con:request><con:originalUri>http://wltdgt02.cc.cec.eu.int/cipa-smp-full-webapp//ehealth-actorid-qns::0088:7770010100777</con:originalUri><con:assertion type="Valid HTTP Status Codes" id="2c5c11d9-018c-4b57-854c-8ae30dab1088" name="Valid HTTP Status Codes"><con:configuration><codes>201,200</codes></con:configuration></con:assertion><con:assertion type="GroovyScriptAssertion" id="a836cda0-de36-460f-b880-1bce8ebec06c" name="Script Assertion"><con:configuration><scriptText>log.info "=============================================="
-log.info "Domains list="+SMP.getDomainCodesList(log, context)
+&lt;/xml-fragment></con:setting><con:setting id="RecordRequestRepresentations">true</con:setting></con:settings><con:endpoint>${#TestSuite#requestBaseUrl}</con:endpoint><con:request>${#TestSuite#PutResourceRequestTemplate}</con:request><con:originalUri>http://wltdgt02.cc.cec.eu.int/cipa-smp-full-webapp//ehealth-actorid-qns::0088:7770010100777</con:originalUri><con:assertion type="Valid HTTP Status Codes" id="2c5c11d9-018c-4b57-854c-8ae30dab1088" name="Valid HTTP Status Codes"><con:configuration><codes>201,200</codes></con:configuration></con:assertion><con:assertion type="GroovyScriptAssertion" id="a836cda0-de36-460f-b880-1bce8ebec06c" name="Script Assertion"><con:configuration><scriptText>
 log.info "=============================================="
 log.info "Request sent to the SMP:"
 log.info new String(messageExchange.getRawRequestData(),"UTF8")
