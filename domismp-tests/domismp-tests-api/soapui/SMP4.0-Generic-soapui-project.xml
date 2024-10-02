@@ -1441,7 +1441,8 @@ log.info "END: Multiple Domains Check script"</script></con:config></con:testSte
 			log.error messageExchange.getProperty('ParticipantIdentifierScheme')
 log.error messageExchange.getProperty('ParticipantIdentifier')
 		}
-// Display request
+log.info "=============================================="
+log.info "Domains list="+SMP.getDomainCodesList(log, context)
 log.info "=============================================="
 log.info "Request sent to the SMP:"
 log.info new String(messageExchange.getRawRequestData(),"UTF8")
