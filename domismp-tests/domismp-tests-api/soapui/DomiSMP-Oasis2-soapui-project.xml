@@ -201,7 +201,13 @@ testRunner.testCase.testSuite.getTestCaseList().each { testCase ->
 		} 
 	}
 }
-log.info "done"</script></con:config></con:testStep><con:properties/></con:testCase><con:testCase id="300d705d-3f9b-4381-b033-5a94e428ba02" failOnError="true" failTestCaseOnErrors="true" keepSession="false" maxResults="0" name="Display domains and groups" searchProperties="true"><con:settings/><con:testStep type="groovy" name="Display domains" id="f582ac38-dbfe-41bb-aed8-7b191870df39"><con:settings/><con:config><script>log.info "====================================================="
+log.info "done"</script></con:config></con:testStep><con:properties/></con:testCase><con:testCase id="300d705d-3f9b-4381-b033-5a94e428ba02" failOnError="true" failTestCaseOnErrors="true" keepSession="false" maxResults="0" name="Display some config info" searchProperties="true"><con:settings/><con:testStep type="groovy" name="Display info" id="f582ac38-dbfe-41bb-aed8-7b191870df39"><con:settings/><con:config><script>log.info "====================================================="
+log.info "====================================================="
+log.info "smp.cluster.enabled="+SMP.getSmpConfigPropertyValue(log, context, "smp.cluster.enabled")
+log.info "====================================================="
+log.info "====================================================="
+log.info "smp.property.refresh.cronJobExpression="+SMP.getSmpConfigPropertyValue(log, context, "smp.property.refresh.cronJobExpression")
+log.info "====================================================="
 log.info "====================================================="
 log.info "Domains list="+SMP.getDomainCodesList(log, context)
 log.info "====================================================="

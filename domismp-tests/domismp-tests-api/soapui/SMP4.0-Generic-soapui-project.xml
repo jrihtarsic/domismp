@@ -1424,11 +1424,18 @@ if (multi.toLowerCase().equals('true') || multi == '1') {
 }
 
 tStep.run(testRunner, context)
-log.info "END: Multiple Domains Check script"</script></con:config></con:testStep><con:properties/></con:testCase><con:testCase id="3dfc1d3a-6895-417a-9920-a4ec071ad7f1" failOnError="true" failTestCaseOnErrors="true" keepSession="false" maxResults="0" name="Display domains and groups" searchProperties="true"><con:settings/><con:testStep type="groovy" name="Display domains and groups info" id="8a8d75d6-295c-4ed2-b5f2-3d7f830c4f4a"><con:settings/><con:config><script>log.info "====================================================="
+log.info "END: Multiple Domains Check script"</script></con:config></con:testStep><con:properties/></con:testCase><con:testCase id="2a0852b4-c18a-44d0-880f-4b714b94fba7" failOnError="true" failTestCaseOnErrors="true" keepSession="false" maxResults="0" name="Display some config info" searchProperties="true"><con:settings/><con:testStep type="groovy" name="Display info" id="0b7b8d21-3197-4c57-a371-eb56fc041629"><con:settings/><con:config><script>log.info "====================================================="
+log.info "====================================================="
+log.info "smp.cluster.enabled="+SMP.getSmpConfigPropertyValue(log, context, "smp.cluster.enabled")
+log.info "====================================================="
+log.info "====================================================="
+log.info "smp.property.refresh.cronJobExpression="+SMP.getSmpConfigPropertyValue(log, context, "smp.property.refresh.cronJobExpression")
+log.info "====================================================="
 log.info "====================================================="
 log.info "Domains list="+SMP.getDomainCodesList(log, context)
 log.info "====================================================="
 log.info "====================================================="
+
 </script></con:config></con:testStep><con:properties/></con:testCase><con:testCase id="e6209b8b-ef20-4564-bb97-154dad11d244" failOnError="true" failTestCaseOnErrors="true" keepSession="false" maxResults="0" name="SMP001-Create ServiceGroup-Basic Flow-Admin Service Group specified" searchProperties="true"><con:description>Create  ServiceGroup-Basic Flow-Admin Service Group specified.
 
 - Send PutServiceGroup request for a new receiver participant: duplet participantIdentifier  + participantIndentifierScheme. Request is sent within the same network as the SMP.
